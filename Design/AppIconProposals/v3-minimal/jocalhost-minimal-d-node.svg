@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title>jocalhost minimal icon proposal D</title>
+  <desc>Dark minimal macOS app icon with a localhost node and active endpoint.</desc>
+  <rect width="1024" height="1024" rx="224" fill="#0B1220"/>
+  <circle
+    cx="512"
+    cy="512"
+    r="196"
+    fill="none"
+    stroke="#F8FAFC"
+    stroke-width="78"/>
+  <path
+    d="M512 316v392"
+    fill="none"
+    stroke="#F8FAFC"
+    stroke-width="78"
+    stroke-linecap="round"/>
+  <circle cx="650" cy="374" r="58" fill="#22C55E"/>
+</svg>

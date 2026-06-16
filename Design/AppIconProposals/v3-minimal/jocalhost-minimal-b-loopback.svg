@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title>jocalhost minimal icon proposal B</title>
+  <desc>Dark minimal macOS app icon with a clean loopback route glyph.</desc>
+  <rect width="1024" height="1024" rx="224" fill="#0B1220"/>
+  <path
+    d="M330 704h244c96 0 174-78 174-174V330"
+    fill="none"
+    stroke="#F8FAFC"
+    stroke-width="82"
+    stroke-linecap="round"
+    stroke-linejoin="round"/>
+  <path
+    d="M632 446 748 330l116 116"
+    fill="none"
+    stroke="#F8FAFC"
+    stroke-width="82"
+    stroke-linecap="round"
+    stroke-linejoin="round"/>
+  <circle cx="330" cy="704" r="48" fill="#22C55E"/>
+</svg>

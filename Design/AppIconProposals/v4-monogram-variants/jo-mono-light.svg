@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title>jocalhost monogram mono light</title>
+  <desc>Light app icon with a centered jo monogram in a developer-style monospace font.</desc>
+  <rect x="4" y="4" width="1016" height="1016" rx="220" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="8"/>
+  <text x="512" y="650" fill="#0B1220" font-family="Menlo, 'SF Mono', 'SFNS Mono', monospace" font-size="372" font-weight="700" letter-spacing="-46" text-anchor="middle">jo</text>
+</svg>

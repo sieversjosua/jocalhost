@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title>jocalhost clean icon proposal B</title>
+  <desc>Flat blue macOS app icon with a crisp command chevron, cursor dash, and green start endpoint.</desc>
+  <rect width="1024" height="1024" rx="224" fill="#2563EB"/>
+  <path
+    d="M320 326l172 186-172 186"
+    fill="none"
+    stroke="#FFFFFF"
+    stroke-width="104"
+    stroke-linecap="round"
+    stroke-linejoin="round"/>
+  <path
+    d="M548 686h156"
+    fill="none"
+    stroke="#FFFFFF"
+    stroke-width="92"
+    stroke-linecap="round"/>
+  <circle cx="704" cy="338" r="58" fill="#16A34A"/>
+</svg>

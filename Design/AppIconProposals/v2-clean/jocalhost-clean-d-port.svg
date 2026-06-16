@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title>jocalhost clean icon proposal D</title>
+  <desc>Flat blue macOS app icon with a minimal port route and active green endpoint.</desc>
+  <rect width="1024" height="1024" rx="224" fill="#2563EB"/>
+  <path
+    d="M308 326h260c94 0 170 76 170 170s-76 170-170 170H456"
+    fill="none"
+    stroke="#FFFFFF"
+    stroke-width="88"
+    stroke-linecap="round"
+    stroke-linejoin="round"/>
+  <path
+    d="M306 326l74-74M306 326l74 74"
+    fill="none"
+    stroke="#FFFFFF"
+    stroke-width="72"
+    stroke-linecap="round"
+    stroke-linejoin="round"/>
+  <circle cx="456" cy="666" r="58" fill="#16A34A"/>
+</svg>
