@@ -8,6 +8,8 @@ jocalhost makes the host Mac explicit. It supervises local dev servers, exposes 
 
 <img src="Docs/Assets/jocalhost-menu-remote.png" alt="jocalhost menu bar popover showing a remote Mac and LAN preview URL" width="720">
 
+<img src="Docs/Assets/jocalhost-project-settings.png" alt="jocalhost project settings window showing remote projects configured on a host Mac" width="720">
+
 Status: alpha. jocalhost is source-buildable and useful for local/LAN workflows, but public signed releases, notarization, auto-update, and hosted preview tunnels are not shipped yet.
 
 ## Why This Exists
