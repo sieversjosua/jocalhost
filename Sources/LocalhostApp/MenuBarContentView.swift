@@ -136,7 +136,7 @@ struct MenuBarContentView: View {
                 Button {
                     showVisualConfig(startsAddingProject: true)
                 } label: {
-                    Label("Add Project", systemImage: "plus")
+                    Label("Add Local Project", systemImage: "plus")
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(JocalhostColors.brandBlue)
@@ -144,7 +144,7 @@ struct MenuBarContentView: View {
                 Button {
                     showVisualConfig()
                 } label: {
-                    Label("Open Config", systemImage: "slider.horizontal.3")
+                    Label("Projects", systemImage: "slider.horizontal.3")
                 }
 
                 Button {
@@ -200,7 +200,7 @@ struct MenuBarContentView: View {
                 Button {
                     showVisualConfig()
                 } label: {
-                    Label("Config", systemImage: "slider.horizontal.3")
+                    Label("Projects", systemImage: "slider.horizontal.3")
                 }
                 .foregroundStyle(JocalhostColors.text)
 
@@ -938,7 +938,7 @@ private enum JocalhostColors {
     static let codeBackground = Color(red: 242 / 255, green: 244 / 255, blue: 247 / 255)
     static let separator = Color(nsColor: .separatorColor)
     static let configWindowBackground = Color(nsColor: .windowBackgroundColor)
-    static let configSidebarBackground = Color(nsColor: .underPageBackgroundColor)
+    static let configSidebarBackground = Color(nsColor: .windowBackgroundColor)
     static let configHeaderBackground = Color(nsColor: .windowBackgroundColor)
     static let configCardBackground = Color(nsColor: .controlBackgroundColor)
     static let configPanelBackground = Color(nsColor: .controlBackgroundColor)
@@ -1082,9 +1082,9 @@ private final class ProjectConfigWindowPresenter: NSObject, ObservableObject, NS
             .environmentObject(store)
         )
         let window = NSWindow(contentViewController: hostingController)
-        window.title = "Visual Config"
+        window.title = "Projects"
         window.styleMask = [.titled, .closable, .miniaturizable]
-        window.contentMinSize = NSSize(width: 760, height: 560)
+        window.contentMinSize = NSSize(width: 820, height: 600)
         window.isReleasedWhenClosed = false
         window.delegate = self
 
@@ -1128,6 +1128,7 @@ struct ProjectConfigView: View {
     @State private var detectionMessage: String?
     @State private var convexCommandSuggestion: String?
     @State private var pendingDeleteProject: ProjectDefinition?
+    @State private var isAddingProject: Bool
 
     init(
         initialProjectID: UUID? = nil,
@@ -1138,6 +1139,7 @@ struct ProjectConfigView: View {
         self.startsAddingProject = startsAddingProject
         self.onDone = onDone
         self._selectedProjectID = State(initialValue: initialProjectID)
+        self._isAddingProject = State(initialValue: startsAddingProject)
     }
 
     var body: some View {
@@ -1158,7 +1160,7 @@ struct ProjectConfigView: View {
 
             footer
         }
-        .frame(width: 760, height: 560)
+        .frame(width: 820, height: 600)
         .background(JocalhostColors.configWindowBackground)
         .onAppear(perform: applyInitialSelection)
         .onChange(of: store.projects) { _, _ in
@@ -1180,7 +1182,7 @@ struct ProjectConfigView: View {
                 delete(project)
             }
         } message: { project in
-            Text("This removes \(project.name) from the visual config.")
+            Text("This removes \(project.name) from Local Projects.")
         }
     }
 
@@ -1197,11 +1199,11 @@ struct ProjectConfigView: View {
             }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("Visual Config")
+                Text("Projects")
                     .font(.headline)
                     .foregroundStyle(JocalhostColors.text)
 
-                Text("\(store.projects.count) configured \(store.projects.count == 1 ? "project" : "projects")")
+                Text(headerSummary)
                     .font(.caption)
                     .foregroundStyle(JocalhostColors.mutedText)
             }
@@ -1211,7 +1213,7 @@ struct ProjectConfigView: View {
             Button {
                 addProject()
             } label: {
-                Label("Add Project", systemImage: "plus")
+                Label("Add Local Project", systemImage: "plus")
             }
             .controlSize(.small)
             .buttonStyle(.borderedProminent)
@@ -1234,7 +1236,7 @@ struct ProjectConfigView: View {
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Projects")
+                Text("Local Projects")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(JocalhostColors.mutedText)
 
@@ -1255,11 +1257,11 @@ struct ProjectConfigView: View {
                         .font(.system(size: 22, weight: .medium))
                         .foregroundStyle(JocalhostColors.brandBlue)
 
-                    Text("No projects yet")
+                    Text("No local projects")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(JocalhostColors.text)
 
-                    Text("Create the first project here instead of editing XML.")
+                    Text("Remote projects stay configured on their host Mac.")
                         .font(.caption)
                         .foregroundStyle(JocalhostColors.mutedText)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1297,51 +1299,187 @@ struct ProjectConfigView: View {
     }
 
     private var editor: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 10) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(currentProject == nil ? "Add Project" : "Edit Project")
-                        .font(.headline)
-                        .foregroundStyle(JocalhostColors.text)
-
-                    Text(currentProject == nil ? "Create a new local server entry." : "Update the selected local server entry.")
-                        .font(.caption)
-                        .foregroundStyle(JocalhostColors.mutedText)
+        VStack(spacing: 0) {
+            if showsEmptyLocalProjectState {
+                emptyLocalProjectEditor
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        editorTitle
+                        projectDetailsEditor
+                        servicesEditor
+                        editorMessages
+                    }
+                    .padding(18)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
                 }
+
+                Divider()
+
+                editorActions
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 12)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(JocalhostColors.configWindowBackground)
+    }
+
+    private var emptyLocalProjectEditor: some View {
+        VStack(spacing: 14) {
+            Spacer()
+
+            Image(systemName: "laptopcomputer")
+                .font(.system(size: 34, weight: .medium))
+                .foregroundStyle(JocalhostColors.brandBlue)
+
+            VStack(spacing: 5) {
+                Text(store.remoteHosts.isEmpty ? "No projects yet" : "Remote projects")
+                    .font(.headline)
+                    .foregroundStyle(JocalhostColors.text)
+
+                Text(emptyLocalProjectMessage)
+                    .font(.callout)
+                    .foregroundStyle(JocalhostColors.mutedText)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 430)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            if store.remoteHosts.isEmpty == false {
+                remoteProjectsOverview
+            }
+
+            Button {
+                addProject()
+            } label: {
+                Label("Add Local Project", systemImage: "plus")
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(JocalhostColors.brandBlue)
+
+            Spacer()
+        }
+        .padding(32)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var remoteProjectsOverview: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label(remoteHostSummary, systemImage: "network")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(JocalhostColors.mutedText)
 
                 Spacer()
 
-                if let currentProject {
-                    StatusPill(status: store.runtime(for: currentProject).status)
+                Button {
+                    store.refreshRemoteHosts()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
                 }
+                .buttonStyle(.borderless)
+                .help("Refresh remote projects")
             }
 
-            VStack(alignment: .leading, spacing: 12) {
-                configField("Name", systemImage: "tag", text: $draft.name)
-                configField("Working Directory", systemImage: "folder", text: $draft.workingDirectory)
-                configField("Command", systemImage: "terminal", text: $draft.command)
-                configField("Port", systemImage: "network", text: $draft.port)
+            ScrollView {
+                VStack(spacing: 10) {
+                    ForEach(store.remoteHosts) { host in
+                        remoteHostProjects(host)
+                    }
+                }
+            }
+            .frame(maxHeight: 260)
+        }
+        .padding(12)
+        .frame(maxWidth: 520)
+        .background(JocalhostColors.configPanelBackground)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(JocalhostColors.separator, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func remoteHostProjects(_ host: RemoteHostDefinition) -> some View {
+        let runtime = store.remoteRuntime(for: host)
+        let projects = runtime.response?.projects ?? []
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                ConnectionIndicator(status: runtime.status)
+
+                Text(runtime.response?.hostName ?? host.name)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(JocalhostColors.text)
+                    .lineLimit(1)
+
+                Text(host.displayAddress)
+                    .font(.caption2.monospaced())
+                    .foregroundStyle(JocalhostColors.mutedText)
+                    .lineLimit(1)
+
+                Spacer()
+            }
+
+            if let errorMessage = runtime.errorMessage,
+               runtime.status == .failed {
+                WarningLine(text: errorMessage)
+            } else if projects.isEmpty {
+                DetailLine(icon: "network", text: emptyRemoteProjectText(runtime.status))
+            } else {
+                ForEach(projects, id: \.id) { project in
+                    RemoteProjectLine(host: host, project: project)
+                }
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
+    private var editorTitle: some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(currentProject == nil ? "Add Local Project" : "Project Details")
+                    .font(.headline)
+                    .foregroundStyle(JocalhostColors.text)
+
+                Text(currentProject == nil ? "Create a project hosted by this Mac." : "Update the selected local project.")
+                    .font(.caption)
+                    .foregroundStyle(JocalhostColors.mutedText)
+            }
+
+            Spacer()
+
+            if let currentProject {
+                StatusPill(status: store.runtime(for: currentProject).status)
+            }
+        }
+    }
+
+    private var projectDetailsEditor: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            configField("Name", systemImage: "tag", text: $draft.name, prompt: "My App")
+            directoryField
+
+            HStack(alignment: .top, spacing: 10) {
+                configField("Command", systemImage: "terminal", text: $draft.command, prompt: "npm run dev")
+                configField("Port", systemImage: "network", text: $draft.port, prompt: "3000")
+                    .frame(width: 112)
+            }
+
+            HStack(spacing: 8) {
                 Toggle(isOn: $draft.exposeOnLocalNetwork) {
-                    Label("Local Network", systemImage: "network")
+                    Label("Expose on local network", systemImage: "network")
                         .font(.caption.weight(.medium))
                         .foregroundStyle(JocalhostColors.mutedText)
                 }
                 .toggleStyle(.checkbox)
-            }
 
-            servicesEditor
-
-            HStack(spacing: 8) {
-                Button {
-                    chooseDirectory()
-                } label: {
-                    Label("Choose Folder", systemImage: "folder")
-                }
+                Spacer()
 
                 Button {
                     runAutodetection()
                 } label: {
-                    Label("Auto Detect", systemImage: "wand.and.stars")
+                    Label("Detect", systemImage: "wand.and.stars")
                 }
                 .disabled(trimmedDirectory.isEmpty)
 
@@ -1350,15 +1488,45 @@ struct ProjectConfigView: View {
                     Button {
                         addConvexService(convexCommandSuggestion)
                     } label: {
-                        Label("Add Convex Dev", systemImage: "bolt.horizontal")
+                        Label("Add Convex", systemImage: "bolt.horizontal")
                     }
                 }
-
-                Spacer()
             }
             .controlSize(.small)
+        }
+        .padding(12)
+        .background(JocalhostColors.configPanelBackground)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(JocalhostColors.separator, lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
 
-            if let validationMessage {
+    private var directoryField: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Label("Project Folder", systemImage: "folder")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(JocalhostColors.mutedText)
+
+            HStack(spacing: 8) {
+                TextField("Path to project folder", text: $draft.workingDirectory)
+                    .textFieldStyle(.roundedBorder)
+
+                Button {
+                    chooseDirectory()
+                } label: {
+                    Image(systemName: "folder")
+                }
+                .accessibilityLabel("Choose folder")
+                .help("Choose folder")
+            }
+        }
+    }
+
+    private var editorMessages: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if shouldShowValidationMessage, let validationMessage {
                 Label(validationMessage, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
                     .foregroundStyle(JocalhostColors.warning)
@@ -1369,47 +1537,48 @@ struct ProjectConfigView: View {
                     .font(.caption)
                     .foregroundStyle(JocalhostColors.brandBlue)
             }
-
-            Spacer(minLength: 0)
-
-            HStack {
-                if let currentProject {
-                    Button(role: .destructive) {
-                        pendingDeleteProject = currentProject
-                    } label: {
-                        Label("Delete", systemImage: "trash")
-                    }
-                }
-
-                Spacer()
-
-                Button {
-                    resetDraft()
-                } label: {
-                    Label("Reset", systemImage: "arrow.uturn.backward")
-                }
-
-                Button {
-                    saveDraft()
-                } label: {
-                    Label("Save", systemImage: "checkmark")
-                }
-                .keyboardShortcut(.defaultAction)
-                .buttonStyle(.borderedProminent)
-                .tint(JocalhostColors.brandBlue)
-                .disabled(makeProject() == nil)
-            }
-            .controlSize(.small)
         }
-        .padding(18)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(JocalhostColors.configWindowBackground)
+    }
+
+    private var editorActions: some View {
+        HStack {
+            if let currentProject {
+                Button(role: .destructive) {
+                    pendingDeleteProject = currentProject
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
+
+            Spacer()
+
+            Button {
+                resetDraft()
+            } label: {
+                Label("Reset", systemImage: "arrow.uturn.backward")
+            }
+
+            Button {
+                saveDraft()
+            } label: {
+                Label("Save", systemImage: "checkmark")
+            }
+            .keyboardShortcut(.defaultAction)
+            .buttonStyle(.borderedProminent)
+            .tint(JocalhostColors.brandBlue)
+            .disabled(makeProject() == nil)
+        }
+        .controlSize(.small)
     }
 
     private var footer: some View {
         HStack(spacing: 8) {
             Image(systemName: "externaldrive")
                 .font(.caption)
+                .foregroundStyle(JocalhostColors.mutedText)
+
+            Text("Local config")
+                .font(.caption2.weight(.medium))
                 .foregroundStyle(JocalhostColors.mutedText)
 
             Text(store.configPath)
@@ -1438,6 +1607,44 @@ struct ProjectConfigView: View {
 
     private var currentProject: ProjectDefinition? {
         store.projects.first { $0.id == draft.id }
+    }
+
+    private var showsEmptyLocalProjectState: Bool {
+        store.projects.isEmpty && isAddingProject == false
+    }
+
+    private var headerSummary: String {
+        let projectCount = store.projects.count
+        let projectSummary = "\(projectCount) local \(projectCount == 1 ? "project" : "projects") on this Mac"
+        guard store.remoteHosts.isEmpty == false else {
+            return projectSummary
+        }
+        return "\(projectSummary) - \(remoteHostSummary)"
+    }
+
+    private var remoteHostSummary: String {
+        let hostCount = store.remoteHosts.count
+        return "\(hostCount) remote \(hostCount == 1 ? "Mac" : "Macs") saved"
+    }
+
+    private var emptyLocalProjectMessage: String {
+        if store.remoteHosts.isEmpty {
+            return "Add one only if this Mac should run dev servers."
+        }
+        return "These projects are configured on their host Mac. This Mac can control them without copying their local config."
+    }
+
+    private func emptyRemoteProjectText(_ status: RemoteHostConnectionStatus) -> String {
+        switch status {
+        case .idle:
+            return "Remote status has not been loaded yet"
+        case .refreshing:
+            return "Loading remote projects"
+        case .online:
+            return "No projects configured on this remote Mac"
+        case .failed:
+            return "Remote status unavailable"
+        }
     }
 
     private var trimmedDirectory: String {
@@ -1491,6 +1698,16 @@ struct ProjectConfigView: View {
         return nil
     }
 
+    private var shouldShowValidationMessage: Bool {
+        currentProject != nil ||
+            draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ||
+            draft.workingDirectory.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ||
+            draft.port.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false ||
+            draft.command.trimmingCharacters(in: .whitespacesAndNewlines) != "npm run dev" ||
+            draft.exposeOnLocalNetwork ||
+            draft.services.isEmpty == false
+    }
+
     private var servicesEditor: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
@@ -1509,7 +1726,7 @@ struct ProjectConfigView: View {
             }
 
             if draft.services.isEmpty {
-                Text("Auto Detect can add web and Convex services here.")
+                Text("Detect can add web and Convex services from the selected folder.")
                     .font(.caption)
                     .foregroundStyle(JocalhostColors.mutedText)
             } else {
@@ -1545,13 +1762,13 @@ struct ProjectConfigView: View {
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
-    private func configField(_ title: String, systemImage: String, text: Binding<String>) -> some View {
+    private func configField(_ title: String, systemImage: String, text: Binding<String>, prompt: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             Label(title, systemImage: systemImage)
                 .font(.caption.weight(.medium))
                 .foregroundStyle(JocalhostColors.mutedText)
 
-            TextField(title, text: text)
+            TextField(prompt ?? title, text: text)
                 .textFieldStyle(.roundedBorder)
         }
     }
@@ -1570,8 +1787,8 @@ struct ProjectConfigView: View {
             return
         }
 
-        if selectedProjectID != nil {
-            addProject()
+        if selectedProjectID != nil || isAddingProject == false {
+            showEmptyLocalProjectState()
         }
     }
 
@@ -1595,6 +1812,7 @@ struct ProjectConfigView: View {
         draft = ProjectDraft(project: project)
         detectionMessage = nil
         convexCommandSuggestion = nil
+        isAddingProject = false
     }
 
     private func addProject() {
@@ -1602,6 +1820,15 @@ struct ProjectConfigView: View {
         draft = ProjectDraft(project: nil)
         detectionMessage = nil
         convexCommandSuggestion = nil
+        isAddingProject = true
+    }
+
+    private func showEmptyLocalProjectState() {
+        selectedProjectID = nil
+        draft = ProjectDraft(project: nil)
+        detectionMessage = nil
+        convexCommandSuggestion = nil
+        isAddingProject = false
     }
 
     private func resetDraft() {
@@ -1622,6 +1849,7 @@ struct ProjectConfigView: View {
         draft = ProjectDraft(project: project)
         detectionMessage = nil
         convexCommandSuggestion = nil
+        isAddingProject = false
     }
 
     private func delete(_ project: ProjectDefinition) {
@@ -1631,7 +1859,7 @@ struct ProjectConfigView: View {
         if let nextProject = store.projects.first {
             select(nextProject)
         } else {
-            addProject()
+            showEmptyLocalProjectState()
         }
     }
 
