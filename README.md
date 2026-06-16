@@ -6,6 +6,8 @@ It started with a Mac Mini doing the actual development work, a MacBook acting a
 
 jocalhost makes the host Mac explicit. It supervises local dev servers, exposes the LAN URL, and lets another Mac inspect or control those runs without pretending both computers share the same `localhost`.
 
+<img src="Docs/Assets/jocalhost-menu-remote.png" alt="jocalhost menu bar popover showing a remote Mac and LAN preview URL" width="720">
+
 Status: alpha. jocalhost is source-buildable and useful for local/LAN workflows, but public signed releases, notarization, auto-update, and hosted preview tunnels are not shipped yet.
 
 ## Why This Exists
