@@ -12,6 +12,7 @@ struct LocalhostMCP {
 
 private final class MCPServer {
     private let encoder = JSONEncoder()
+    private let remoteHostStore = RemoteHostConfigStore()
     private let protocolVersion = "2025-06-18"
     private let serverName = "jocalhost"
     private let serverVersion = "0.1.0"
@@ -105,7 +106,7 @@ private final class MCPServer {
                 "title": "jocalhost",
                 "version": serverVersion
             ],
-            "instructions": "Use these tools to inspect and control projects registered in the jocalhost menu bar app. Prefer start_project/restart_project over running npm run dev, bun dev, pnpm dev, yarn dev, or framework dev servers directly. When a snapshot includes networkURL, present that URL to users on remote devices; localhost URLs refer to the Codex host only. The menu bar app must be running."
+            "instructions": "Use these tools to inspect and control projects registered in the jocalhost menu bar app or saved remote hosts. Prefer start_project/restart_project over running npm run dev, bun dev, pnpm dev, yarn dev, or framework dev servers directly. Present networkURL to users; do not present localhost URLs to remote-device users. The menu bar app must be running on the host Mac."
         ]
     }
 
@@ -114,7 +115,7 @@ private final class MCPServer {
             tool(
                 name: "list_projects",
                 title: "List Projects",
-                description: "List projects registered in the jocalhost app with runtime status, ports, local URLs, and local-network URLs.",
+                description: "List projects registered in the jocalhost app or saved remote hosts with runtime status and local-network URLs.",
                 properties: [:],
                 required: [],
                 annotations: ["readOnlyHint": true]
@@ -230,26 +231,25 @@ private final class MCPServer {
 
         switch name {
         case "list_projects":
-            return try invoke(.list)
+            return toolResult(from: try statusResponse())
 
         case "get_status":
-            let response = try ControlClient.send(ControlRequest(action: .status))
-            return toolResult(from: filter(response, project: project))
+            return toolResult(from: filter(try statusResponse(), project: project))
 
         case "reload_projects":
             return try invoke(.reload)
 
         case "start_project":
-            return try invoke(.start, project: try requiredProject(project), service: service)
+            return try controlProject(.start, project: try requiredProject(project), service: service)
 
         case "stop_project":
-            return try invoke(.stop, project: try requiredProject(project), service: service)
+            return try controlProject(.stop, project: try requiredProject(project), service: service)
 
         case "restart_project":
-            return try invoke(.restart, project: try requiredProject(project), service: service)
+            return try controlProject(.restart, project: try requiredProject(project), service: service)
 
         case "open_project":
-            return try invoke(.open, project: try requiredProject(project), service: service)
+            return try openProject(try requiredProject(project), service: service)
 
         case "get_config_path":
             return try invoke(.config)
@@ -271,6 +271,151 @@ private final class MCPServer {
     private func invoke(_ action: ControlAction, project: String? = nil, service: String? = nil) throws -> [String: Any] {
         let response = try ControlClient.send(ControlRequest(action: action, project: project, service: service))
         return toolResult(from: response)
+    }
+
+    private func statusResponse() throws -> ControlResponse {
+        var projects: [ControlProjectSnapshot] = []
+        var failures: [String] = []
+        var hostName: String?
+        var hostAddress: String?
+        var lanStatusURL: String?
+
+        do {
+            let response = try ControlClient.send(ControlRequest(action: .status))
+            appendUnique(response.projects, to: &projects)
+            hostName = response.hostName
+            hostAddress = response.hostAddress
+            lanStatusURL = response.lanStatusURL
+            if response.ok == false, let message = response.message {
+                failures.append(message)
+            }
+        } catch {
+            failures.append("local jocalhost unavailable: \(error.localizedDescription)")
+        }
+
+        for result in remoteStatuses() {
+            if let response = result.response {
+                appendUnique(response.projects, to: &projects)
+                if hostName == nil {
+                    hostName = response.hostName ?? result.host.name
+                    hostAddress = response.hostAddress
+                    lanStatusURL = response.lanStatusURL
+                }
+            } else if let errorMessage = result.errorMessage {
+                failures.append("\(result.host.name): \(errorMessage)")
+            }
+        }
+
+        return ControlResponse(
+            ok: projects.isEmpty == false || failures.isEmpty,
+            message: projects.isEmpty ? failures.joined(separator: "; ") : nil,
+            projects: projects,
+            hostName: hostName,
+            hostAddress: hostAddress,
+            lanStatusURL: lanStatusURL
+        )
+    }
+
+    private func controlProject(_ action: ControlAction, project selector: String, service: String?) throws -> [String: Any] {
+        if let localStatus = try? ControlClient.send(ControlRequest(action: .status)),
+           containsProject(selector, in: localStatus) {
+            return try invoke(action, project: selector, service: service)
+        }
+
+        for result in remoteStatuses() {
+            guard let status = result.response,
+                  containsProject(selector, in: status),
+                  let url = result.host.controlURL else {
+                continue
+            }
+
+            let request = ControlRequest(action: action, project: selector, service: service)
+            let response = try waitForAsync {
+                try await LANStatusClient.sendControl(request, to: url, token: result.host.token)
+            }
+
+            if response.projects.isEmpty,
+               let statusURL = result.host.statusURL,
+               let updated = try? waitForAsync({
+                   try await LANStatusClient.fetchStatus(from: statusURL, token: result.host.token)
+               }) {
+                return toolResult(from: filter(updated, project: selector))
+            }
+
+            return toolResult(from: response)
+        }
+
+        return toolResult(from: filter(try statusResponse(), project: selector))
+    }
+
+    private func openProject(_ selector: String, service: String?) throws -> [String: Any] {
+        if let localStatus = try? ControlClient.send(ControlRequest(action: .status)),
+           containsProject(selector, in: localStatus) {
+            return try invoke(.open, project: selector, service: service)
+        }
+
+        for result in remoteStatuses() {
+            guard let status = result.response,
+                  let project = matchingProject(selector, in: status.projects),
+                  let urlString = networkURL(for: project, service: service),
+                  let url = URL(string: urlString) else {
+                continue
+            }
+
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/open")
+            process.arguments = [url.absoluteString]
+            try process.run()
+            process.waitUntilExit()
+
+            guard process.terminationStatus == 0 else {
+                throw MCPError(code: -32000, message: "open failed for \(urlString)")
+            }
+
+            return toolResult(from: filter(status, project: selector))
+        }
+
+        return toolResult(from: filter(try statusResponse(), project: selector))
+    }
+
+    private func remoteStatuses() -> [RemoteStatusResult] {
+        let hosts = (try? remoteHostStore.load().filter(\.isEnabled)) ?? []
+        guard hosts.isEmpty == false else {
+            return []
+        }
+
+        return (try? waitForAsync {
+            await withTaskGroup(of: RemoteStatusResult.self) { group in
+                for host in hosts {
+                    group.addTask {
+                        guard let url = host.statusURL else {
+                            return RemoteStatusResult(host: host, response: nil, errorMessage: "invalid status URL")
+                        }
+
+                        do {
+                            let response = try await LANStatusClient.fetchStatus(from: url, token: host.token)
+                            return RemoteStatusResult(host: host, response: response, errorMessage: nil)
+                        } catch {
+                            return RemoteStatusResult(host: host, response: nil, errorMessage: error.localizedDescription)
+                        }
+                    }
+                }
+
+                var results: [RemoteStatusResult] = []
+                for await result in group {
+                    results.append(result)
+                }
+                return results
+            }
+        }) ?? []
+    }
+
+    private func appendUnique(_ newProjects: [ControlProjectSnapshot], to projects: inout [ControlProjectSnapshot]) {
+        for project in newProjects where projects.contains(where: { existing in
+            existing.id == project.id && existing.networkURL == project.networkURL
+        }) == false {
+            projects.append(project)
+        }
     }
 
     private func filter(_ response: ControlResponse, project selector: String?) -> ControlResponse {
@@ -298,12 +443,15 @@ private final class MCPServer {
             ok: response.ok,
             message: response.message,
             projects: projects,
-            configPath: response.configPath
+            configPath: response.configPath,
+            hostName: response.hostName,
+            hostAddress: response.hostAddress,
+            lanStatusURL: response.lanStatusURL
         )
     }
 
     private func toolResult(from controlResponse: ControlResponse) -> [String: Any] {
-        let structuredContent = (try? jsonObject(controlResponse)) as? [String: Any] ?? [
+        let structuredContent = (try? sanitizedJSON(controlResponse)) as? [String: Any] ?? [
             "ok": controlResponse.ok,
             "message": controlResponse.message ?? ""
         ]
@@ -334,7 +482,7 @@ private final class MCPServer {
         }
 
         let lines = response.projects.map { project in
-            let url = project.networkURL ?? project.localURL ?? (project.port ?? project.detectedPort).map { ":\($0)" } ?? "-"
+            let url = project.networkURL ?? project.services.first { $0.networkURL != nil }?.networkURL ?? "no network URL"
             let pid = project.pid.map(String.init) ?? "-"
             let projectLine = "\(project.status.rawValue) \(url) pid=\(pid) \(project.name)"
             guard project.services.count > 1 else {
@@ -342,7 +490,7 @@ private final class MCPServer {
             }
 
             let serviceLines = project.services.map { service in
-                let serviceURL = service.networkURL ?? service.localURL ?? (service.port ?? service.detectedPort).map { ":\($0)" } ?? "-"
+                let serviceURL = service.networkURL ?? "no network URL"
                 let servicePid = service.pid.map(String.init) ?? "-"
                 return "  \(service.status.rawValue) \(serviceURL) pid=\(servicePid) \(service.name)"
             }
@@ -359,6 +507,66 @@ private final class MCPServer {
     private func jsonObject<T: Encodable>(_ value: T) throws -> Any {
         let data = try encoder.encode(value)
         return try JSONSerialization.jsonObject(with: data)
+    }
+
+    private func sanitizedJSON<T: Encodable>(_ value: T) throws -> Any {
+        sanitize(try jsonObject(value))
+    }
+
+    private func sanitize(_ value: Any) -> Any {
+        if var dictionary = value as? [String: Any] {
+            dictionary.removeValue(forKey: "localURL")
+            dictionary.removeValue(forKey: "recentLog")
+            return dictionary.mapValues(sanitize)
+        }
+
+        if let array = value as? [Any] {
+            return array.map(sanitize)
+        }
+
+        return value
+    }
+
+    private func containsProject(_ selector: String, in response: ControlResponse) -> Bool {
+        matchingProject(selector, in: response.projects) != nil
+    }
+
+    private func matchingProject(_ selector: String, in projects: [ControlProjectSnapshot]) -> ControlProjectSnapshot? {
+        projects.first { project in
+            project.id.uuidString == selector ||
+                project.name == selector ||
+                project.name.localizedCaseInsensitiveContains(selector)
+        }
+    }
+
+    private func networkURL(for project: ControlProjectSnapshot, service selector: String?) -> String? {
+        if let selector,
+           let service = project.services.first(where: { service in
+               service.id.uuidString == selector ||
+                   service.name == selector ||
+                   service.name.localizedCaseInsensitiveContains(selector)
+           }) {
+            return service.networkURL
+        }
+
+        return project.networkURL ?? project.services.first { $0.networkURL != nil }?.networkURL
+    }
+
+    private func waitForAsync<T: Sendable>(_ operation: @escaping @Sendable () async throws -> T) throws -> T {
+        let semaphore = DispatchSemaphore(value: 0)
+        let box = ResultBox<T>()
+
+        Task {
+            do {
+                box.result = .success(try await operation())
+            } catch {
+                box.result = .failure(error)
+            }
+            semaphore.signal()
+        }
+
+        semaphore.wait()
+        return try box.result!.get()
     }
 
     private func response(id: Any?, result: Any) -> [String: Any] {
@@ -405,4 +613,14 @@ private final class MCPServer {
 private struct MCPError: Error {
     var code: Int
     var message: String
+}
+
+private final class ResultBox<T>: @unchecked Sendable {
+    var result: Result<T, Error>?
+}
+
+private struct RemoteStatusResult: Sendable {
+    var host: RemoteHostDefinition
+    var response: ControlResponse?
+    var errorMessage: String?
 }

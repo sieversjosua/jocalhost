@@ -6,9 +6,16 @@ It started with a Mac Mini doing the actual development work, a MacBook acting a
 
 jocalhost makes the host Mac explicit. It supervises local dev servers, exposes the LAN URL, and lets another Mac inspect or control those runs without pretending both computers share the same `localhost`.
 
-<img src="Docs/Assets/jocalhost-menu-remote.png" alt="jocalhost menu bar popover showing a remote Mac and LAN preview URL" width="720">
-
-<img src="Docs/Assets/jocalhost-project-settings.png" alt="jocalhost project settings window showing remote projects configured on a host Mac" width="720">
+<table>
+  <tr>
+    <td width="50%">
+      <img src="Docs/Assets/jocalhost-menu-remote.png" alt="jocalhost menu bar popover showing a remote Mac and LAN preview URL">
+    </td>
+    <td width="50%">
+      <img src="Docs/Assets/jocalhost-project-settings.png" alt="jocalhost project settings window showing remote projects configured on a host Mac">
+    </td>
+  </tr>
+</table>
 
 Status: alpha. jocalhost is source-buildable and useful for local/LAN workflows, but public signed releases, notarization, auto-update, and hosted preview tunnels are not shipped yet.
 
@@ -141,7 +148,7 @@ If a hosted project lives under protected macOS folders such as `~/Documents`, g
 
 ## MCP Server
 
-`jocalhost-mcp` is a minimal stdio MCP server. It exposes the running menu bar app as tools:
+`jocalhost-mcp` is a minimal stdio MCP server. It exposes the running menu bar app and saved remote hosts as tools:
 
 - `list_projects`
 - `get_status`
@@ -163,6 +170,8 @@ Example client config:
   }
 }
 ```
+
+Tool summaries prefer `networkURL` and omit `localhost` preview links, so remote-device Codex sessions do not hand users a URL that only works on the host Mac.
 
 ## Example Project Config
 
