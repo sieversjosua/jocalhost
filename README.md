@@ -1,8 +1,23 @@
 # jocalhost
 
-Native macOS menu bar app for supervising local development servers and opening the right preview URL from the right machine.
+jocalhost is a native macOS menu bar app for one very specific modern dev problem: `localhost` stops being obvious once your coding workflow spans multiple machines and AI agents.
+
+It started with a Mac Mini doing the actual development work, a MacBook acting as the roaming control surface, and Codex needing a reliable way to know which preview URL is real. The dev server might run on the Mac Mini, but the browser might open on the MacBook. In that world, `http://localhost:3000` is usually the wrong answer.
+
+jocalhost makes the host Mac explicit. It supervises local dev servers, exposes the LAN URL, and lets another Mac inspect or control those runs without pretending both computers share the same `localhost`.
 
 Status: alpha. jocalhost is source-buildable and useful for local/LAN workflows, but public signed releases, notarization, auto-update, and hosted preview tunnels are not shipped yet.
+
+## Why This Exists
+
+AI coding workflows made preview state messy:
+
+- a dev server is running somewhere, but not necessarily on the machine in your hands
+- an agent can start a server, but the user still needs the right browser URL
+- `localhost` means different things to the host Mac, the client Mac, and a remote control tool
+- menu bar state is faster than digging through terminal tabs
+
+jocalhost is the small local boundary for that mess: one app owns the dev-server process, one status endpoint describes it, and every client uses the host's `networkURL` when it needs to open the preview.
 
 ## What It Does
 
