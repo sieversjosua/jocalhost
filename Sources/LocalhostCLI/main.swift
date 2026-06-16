@@ -98,14 +98,22 @@ struct LocalhostCLI {
     private static func printLANInfo(isJSON: Bool) throws {
         let port = LANRemoteAccess.configuredPort()
         let address = LocalNetwork.preferredIPv4Address()
+        let token = try LANRemoteAccess.ensureToken()
+        let hostName = Host.current().localizedName ?? ProcessInfo.processInfo.hostName
         let info = LANInfo(
             ok: true,
-            hostName: Host.current().localizedName ?? ProcessInfo.processInfo.hostName,
+            hostName: hostName,
             hostAddress: address,
             port: port,
             lanStatusURL: LANRemoteAccess.statusURL(address: address, port: port),
-            token: try LANRemoteAccess.ensureToken(),
-            tokenPath: LANRemoteAccess.defaultTokenURL.path
+            token: token,
+            tokenPath: LANRemoteAccess.defaultTokenURL.path,
+            setupCommand: LANRemoteAccess.remoteSetupCommand(
+                hostName: hostName,
+                hostAddress: address,
+                port: port,
+                token: token
+            )
         )
 
         if isJSON {
@@ -116,9 +124,10 @@ struct LocalhostCLI {
         print("LAN status endpoint")
         print("Host: \(info.hostName)")
         print("URL: \(info.lanStatusURL ?? "-")")
-        print("Token: \(info.token)")
         print("Token path: \(info.tokenPath)")
-        print("Remote example: jocalhostctl --remote \(info.hostAddress ?? "HOST") --token \(info.token) status")
+        print("")
+        print("Remote setup command:")
+        print(info.setupCommand)
     }
 
     private static func handleRemoteHostCommand(_ invocation: Invocation) throws {
@@ -482,6 +491,7 @@ private struct LANInfo: Encodable {
     var lanStatusURL: String?
     var token: String
     var tokenPath: String
+    var setupCommand: String
 }
 
 private struct RemoteHostCommandResult: Encodable {

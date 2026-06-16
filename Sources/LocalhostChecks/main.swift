@@ -17,6 +17,7 @@ enum LocalhostChecks {
             try testDevServerLaunchAdapterAddsHostFlags(in: directory)
             try testLANRemoteAccessUsesConfiguredPort()
             try testLANRemoteAccessBuildsStatusURL()
+            try testLANRemoteAccessBuildsRemoteSetupCommand()
             try testLANRemoteAccessCreatesStableToken(in: directory)
             try testRemoteHostDefinitionNormalizesHostAndPort()
             try testRemoteHostConfigStoreRoundTripsHosts(in: directory)
@@ -299,6 +300,18 @@ enum LocalhostChecks {
         try expect(
             LANRemoteAccess.statusURL(address: nil, port: 48_231) == nil,
             "Expected LAN status URL to be nil without a network address"
+        )
+    }
+
+    private static func testLANRemoteAccessBuildsRemoteSetupCommand() throws {
+        try expect(
+            LANRemoteAccess.remoteSetupCommand(
+                hostName: "Josua's Mac Mini",
+                hostAddress: "192.168.1.23",
+                port: 48_231,
+                token: "abc'def"
+            ) == "jocalhostctl remote-add 'Josua'\\''s Mac Mini' '192.168.1.23' --token 'abc'\\''def' --port 48231",
+            "Expected remote setup command to shell-quote dynamic values"
         )
     }
 

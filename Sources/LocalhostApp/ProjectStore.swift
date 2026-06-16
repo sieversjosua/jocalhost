@@ -585,6 +585,23 @@ final class ProjectStore: ObservableObject {
         )
     }
 
+    func copyRemoteSetupCommand() {
+        do {
+            let token = try LANRemoteAccess.ensureToken()
+            let command = LANRemoteAccess.remoteSetupCommand(
+                hostName: hostName(),
+                hostAddress: LocalNetwork.preferredIPv4Address(),
+                port: lanStatusServer?.port ?? LANRemoteAccess.configuredPort(),
+                token: token
+            )
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(command, forType: .string)
+            errorMessage = nil
+        } catch {
+            errorMessage = "Remote setup command could not be copied: \(error.localizedDescription)"
+        }
+    }
+
     private func refreshRemoteHost(_ host: RemoteHostDefinition) {
         guard let url = host.statusURL else {
             remoteHostRuntimes[host.id] = RemoteHostRuntime(

@@ -224,9 +224,16 @@ struct MenuBarContentView: View {
                         .lineLimit(1)
                         .truncationMode(.middle)
                     Spacer(minLength: 0)
+                    Button {
+                        store.copyRemoteSetupCommand()
+                    } label: {
+                        Image(systemName: "doc.on.doc")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Copy remote setup command")
                 }
                 .foregroundStyle(JocalhostColors.mutedText)
-                .help("LAN status/control endpoint. Use jocalhostctl lan-info on this Mac to get the token.")
+                .help("LAN status/control endpoint")
             }
         }
         .controlSize(.small)

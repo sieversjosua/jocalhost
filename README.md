@@ -103,48 +103,27 @@ Use the bundled CLI to control the running menu bar app:
 ./dist/jocalhostctl lan-info
 ```
 
-## LAN Remote Control
+## Remote Mac Setup
 
-When `jocalhost.app` is running, it starts an HTTP status/control endpoint on port `48231` by default. Override the port with:
+One Mac hosts the dev server. Another Mac can save that host and use its real LAN preview URLs.
 
-```sh
-JOCALHOST_LAN_PORT=48232 swift run jocalhost
-```
-
-On the host Mac, print the LAN URL and token:
+On the host Mac, open jocalhost and copy the remote setup command from the LAN footer. From Terminal, the same command is available with:
 
 ```sh
 ./dist/jocalhostctl lan-info
 ```
 
-From another Mac in the same network:
+Run the copied command on the client Mac:
 
 ```sh
-./dist/jocalhostctl --remote 192.168.1.23 --token "<token>" status
-./dist/jocalhostctl --remote 192.168.1.23 --token "<token>" start "My App"
-./dist/jocalhostctl --remote 192.168.1.23 --token "<token>" stop "My App"
-./dist/jocalhostctl --remote 192.168.1.23 --token "<token>" restart "My App"
+jocalhostctl remote-add 'Mac Mini' '192.168.1.23' --token '<token>' --port 48231
 ```
 
-Remote hosts can be saved on the client Mac:
+Open jocalhost on the client Mac. The host appears under Remote, and preview links use `networkURL` instead of the host's `localhost`.
 
-```sh
-./dist/jocalhostctl remote-add "Workstation" 192.168.1.23 --token "<token>"
-./dist/jocalhostctl remote-list
-./dist/jocalhostctl remote-disable "Workstation"
-./dist/jocalhostctl remote-enable "Workstation"
-./dist/jocalhostctl remote-remove "Workstation"
-```
+Advanced: the LAN control endpoint listens on port `48231` by default. Override it with `JOCALHOST_LAN_PORT=48232`. Saved remote hosts live in `~/.config/jocalhost/remote-hosts.plist`.
 
-Saved remote hosts live at:
-
-```txt
-~/.config/jocalhost/remote-hosts.plist
-```
-
-Remote project links open `networkURL`, not the remote host's `localhost` URL, because `localhost` always points at the machine running the browser.
-
-If a hosted project lives under protected macOS folders such as `~/Documents`, give `jocalhost.app` Full Disk Access on the host Mac. Otherwise remote start/stop can work while the child dev server hangs before opening its port.
+If a hosted project lives under protected macOS folders such as `~/Documents`, give `jocalhost.app` Full Disk Access on the host Mac.
 
 ## MCP Server
 

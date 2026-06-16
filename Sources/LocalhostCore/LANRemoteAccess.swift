@@ -27,6 +27,11 @@ public enum LANRemoteAccess {
         address.map { "http://\($0):\(port)/v1/status" }
     }
 
+    public static func remoteSetupCommand(hostName: String, hostAddress: String?, port: Int, token: String) -> String {
+        let host = hostAddress ?? "HOST"
+        return "jocalhostctl remote-add \(shellQuote(hostName)) \(shellQuote(host)) --token \(shellQuote(token)) --port \(port)"
+    }
+
     public static func endpointURL(host: String, port: Int = defaultPort, path: String = "/v1/status") throws -> URL {
         let trimmedHost = host.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmedHost.isEmpty == false else {
@@ -122,6 +127,10 @@ public enum LANRemoteAccess {
             .replacingOccurrences(of: "+", with: "-")
             .replacingOccurrences(of: "/", with: "_")
             .replacingOccurrences(of: "=", with: "")
+    }
+
+    private static func shellQuote(_ value: String) -> String {
+        "'\(value.replacingOccurrences(of: "'", with: "'\\''"))'"
     }
 }
 
