@@ -114,14 +114,6 @@ private final class MCPServer {
     private func tools() -> [[String: Any]] {
         [
             tool(
-                name: "list_projects",
-                title: "List Projects",
-                description: "List projects registered in the jocalhost app or saved remote hosts with runtime status and local-network URLs.",
-                properties: [:],
-                required: [],
-                annotations: ["readOnlyHint": true]
-            ),
-            tool(
                 name: "get_status",
                 title: "Get Status",
                 description: "Get runtime status and URLs for all projects, or one project when a selector is provided.",
@@ -260,9 +252,6 @@ private final class MCPServer {
         let service = arguments["service"] as? String
 
         switch name {
-        case "list_projects":
-            return toolResult(from: try statusResponse())
-
         case "get_status":
             return toolResult(from: filter(try statusResponse(), project: project))
 

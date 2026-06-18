@@ -592,7 +592,7 @@ struct RemoteHostRowView: View {
             if host.isEnabled == false {
                 DetailLine(icon: "pause.circle", text: "Remote host is disabled")
             } else if projects.isEmpty {
-                DetailLine(icon: "network", text: emptyRemoteText(runtime.status))
+                DetailLine(icon: "network", text: emptyRemoteStatusText(runtime.status))
             } else {
                 VStack(spacing: 6) {
                     ForEach(projects, id: \.id) { project in
@@ -628,18 +628,6 @@ struct RemoteHostRowView: View {
         }
     }
 
-    private func emptyRemoteText(_ status: RemoteHostConnectionStatus) -> String {
-        switch status {
-        case .idle:
-            return "Remote status has not been loaded yet"
-        case .refreshing:
-            return "Loading remote projects"
-        case .online:
-            return "No projects configured on remote host"
-        case .failed:
-            return "Remote status unavailable"
-        }
-    }
 }
 
 private struct RemoteProjectLine: View {
@@ -928,6 +916,19 @@ private struct WarningLine: View {
     }
 }
 
+private func emptyRemoteStatusText(_ status: RemoteHostConnectionStatus) -> String {
+    switch status {
+    case .idle:
+        return "Remote status has not been loaded yet"
+    case .refreshing:
+        return "Loading remote projects"
+    case .online:
+        return "No projects configured on remote host"
+    case .failed:
+        return "Remote status unavailable"
+    }
+}
+
 private func statusColor(_ status: ProjectStatus) -> Color {
     switch status {
     case .stopped:
@@ -951,13 +952,9 @@ private enum JocalhostColors {
     static let codeBackground = Color(red: 242 / 255, green: 244 / 255, blue: 247 / 255)
     static let separator = Color(nsColor: .separatorColor)
     static let configWindowBackground = Color(nsColor: .windowBackgroundColor)
-    static let configSidebarBackground = Color(nsColor: .windowBackgroundColor)
-    static let configHeaderBackground = Color(nsColor: .windowBackgroundColor)
-    static let configCardBackground = Color(nsColor: .controlBackgroundColor)
     static let configPanelBackground = Color(nsColor: .controlBackgroundColor)
     static let configSelectedBackground = Color(nsColor: .selectedContentBackgroundColor).opacity(0.18)
     static let configSelectedBorder = Color(nsColor: .selectedContentBackgroundColor).opacity(0.45)
-    static let configIconBackground = Color(nsColor: .controlBackgroundColor)
     static let text = Color.primary
     static let mutedText = Color.secondary
     static let runningGreen = Color(red: 22 / 255, green: 163 / 255, blue: 74 / 255)
@@ -1203,7 +1200,7 @@ struct ProjectConfigView: View {
         HStack(spacing: 12) {
             ZStack {
                 RoundedRectangle(cornerRadius: 7)
-                    .fill(JocalhostColors.configIconBackground)
+                    .fill(JocalhostColors.configPanelBackground)
                     .frame(width: 36, height: 36)
 
                 Image(systemName: "slider.horizontal.3")
@@ -1243,7 +1240,7 @@ struct ProjectConfigView: View {
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 14)
-        .background(JocalhostColors.configHeaderBackground)
+        .background(JocalhostColors.configWindowBackground)
     }
 
     private var sidebar: some View {
@@ -1281,7 +1278,7 @@ struct ProjectConfigView: View {
                 }
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(JocalhostColors.configCardBackground)
+                .background(JocalhostColors.configPanelBackground)
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
                         .stroke(JocalhostColors.separator, lineWidth: 1)
@@ -1308,7 +1305,7 @@ struct ProjectConfigView: View {
         .padding(14)
         .frame(width: 238, alignment: .topLeading)
         .frame(maxHeight: .infinity, alignment: .topLeading)
-        .background(JocalhostColors.configSidebarBackground)
+        .background(JocalhostColors.configWindowBackground)
     }
 
     private var editor: some View {
@@ -1438,7 +1435,7 @@ struct ProjectConfigView: View {
                runtime.status == .failed {
                 WarningLine(text: errorMessage)
             } else if projects.isEmpty {
-                DetailLine(icon: "network", text: emptyRemoteProjectText(runtime.status))
+                DetailLine(icon: "network", text: emptyRemoteStatusText(runtime.status))
             } else {
                 ForEach(projects, id: \.id) { project in
                     RemoteProjectLine(host: host, project: project)
@@ -1615,7 +1612,7 @@ struct ProjectConfigView: View {
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 10)
-        .background(JocalhostColors.configHeaderBackground)
+        .background(JocalhostColors.configWindowBackground)
     }
 
     private var currentProject: ProjectDefinition? {
@@ -1645,19 +1642,6 @@ struct ProjectConfigView: View {
             return "Add one only if this Mac should run dev servers."
         }
         return "These projects are configured on their host Mac. This Mac can control them without copying their local config."
-    }
-
-    private func emptyRemoteProjectText(_ status: RemoteHostConnectionStatus) -> String {
-        switch status {
-        case .idle:
-            return "Remote status has not been loaded yet"
-        case .refreshing:
-            return "Loading remote projects"
-        case .online:
-            return "No projects configured on this remote Mac"
-        case .failed:
-            return "Remote status unavailable"
-        }
     }
 
     private var trimmedDirectory: String {
@@ -2208,7 +2192,7 @@ private struct ConfigProjectListItem: View {
             }
             .padding(10)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(isSelected ? JocalhostColors.configSelectedBackground : JocalhostColors.configCardBackground)
+            .background(isSelected ? JocalhostColors.configSelectedBackground : JocalhostColors.configPanelBackground)
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
                     .stroke(isSelected ? JocalhostColors.configSelectedBorder : JocalhostColors.separator, lineWidth: 1)

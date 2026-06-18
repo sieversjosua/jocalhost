@@ -130,7 +130,6 @@ If a hosted project lives under protected macOS folders such as `~/Documents`, g
 
 `jocalhost-mcp` is a minimal stdio MCP server. It exposes the running menu bar app and saved remote hosts as tools:
 
-- `list_projects`
 - `get_status`
 - `reload_projects`
 - `add_project`
