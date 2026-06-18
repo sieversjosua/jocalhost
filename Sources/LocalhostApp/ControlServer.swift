@@ -40,7 +40,7 @@ final class ControlServer: @unchecked Sendable {
                 throw POSIXError(.init(rawValue: errno) ?? .EIO)
             }
 
-            setNonBlocking(fd)
+            fd.setNonBlocking()
 
             let source = DispatchSource.makeReadSource(fileDescriptor: fd, queue: queue)
             source.setEventHandler { [weak self] in
@@ -88,7 +88,7 @@ final class ControlServer: @unchecked Sendable {
     }
 
     private func handle(clientFD: Int32) {
-        setBlocking(clientFD)
+        clientFD.setBlocking()
 
         do {
             let requestData = try readLineWithTimeout(
@@ -119,24 +119,6 @@ final class ControlServer: @unchecked Sendable {
         try? write(response, to: fd)
 
         close(fd)
-    }
-
-    private func setNonBlocking(_ fd: Int32) {
-        let flags = fcntl(fd, F_GETFL, 0)
-        guard flags >= 0 else {
-            return
-        }
-
-        _ = fcntl(fd, F_SETFL, flags | O_NONBLOCK)
-    }
-
-    private func setBlocking(_ fd: Int32) {
-        let flags = fcntl(fd, F_GETFL, 0)
-        guard flags >= 0 else {
-            return
-        }
-
-        _ = fcntl(fd, F_SETFL, flags & ~O_NONBLOCK)
     }
 
     private func readLineWithTimeout(

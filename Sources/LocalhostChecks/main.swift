@@ -12,8 +12,6 @@ enum LocalhostChecks {
             try testSaveAndLoadRoundTripsLocalNetworkExposure(in: directory)
             try testWhitespaceOnlyConfigLoadsAsEmpty(in: directory)
             try testInvalidConfigThrowsAndCreatesBackup(in: directory)
-            try testLegacyPropertyListConfigMigratesToJocalhostPath(in: directory)
-            try testLegacyJSONConfigMigratesToPropertyList(in: directory)
             try testDevServerLaunchAdapterAddsHostFlags(in: directory)
             try testLANRemoteAccessUsesConfiguredPort()
             try testLANRemoteAccessBuildsStatusURL()
@@ -43,7 +41,7 @@ enum LocalhostChecks {
 
     private static func testEnsureExistsCreatesEmptyConfig(in directory: URL) throws {
         let configURL = directory.appendingPathComponent("nested/projects.plist")
-        let store = ProjectConfigStore(configURL: configURL, legacyJSONURL: nil)
+        let store = ProjectConfigStore(configURL: configURL)
 
         try store.ensureExists()
 
@@ -54,7 +52,7 @@ enum LocalhostChecks {
 
     private static func testSaveAndLoadRoundTripsProjects(in directory: URL) throws {
         let configURL = directory.appendingPathComponent("roundtrip/projects.plist")
-        let store = ProjectConfigStore(configURL: configURL, legacyJSONURL: nil)
+        let store = ProjectConfigStore(configURL: configURL)
         let project = ProjectDefinition(
             id: UUID(uuidString: "2EE55378-F944-4C6C-9C21-A9C1D919D4B3")!,
             name: "Example",
@@ -70,7 +68,7 @@ enum LocalhostChecks {
 
     private static func testSaveAndLoadRoundTripsProjectServices(in directory: URL) throws {
         let configURL = directory.appendingPathComponent("service-roundtrip/projects.plist")
-        let store = ProjectConfigStore(configURL: configURL, legacyJSONURL: nil)
+        let store = ProjectConfigStore(configURL: configURL)
         let project = ProjectDefinition(
             id: UUID(uuidString: "68A8A74F-4E8B-4F4D-B70D-40B171295FB9")!,
             name: "Full Stack",
@@ -99,7 +97,7 @@ enum LocalhostChecks {
 
     private static func testSaveAndLoadRoundTripsLocalNetworkExposure(in directory: URL) throws {
         let configURL = directory.appendingPathComponent("lan-roundtrip/projects.plist")
-        let store = ProjectConfigStore(configURL: configURL, legacyJSONURL: nil)
+        let store = ProjectConfigStore(configURL: configURL)
         let project = ProjectDefinition(
             id: UUID(uuidString: "49C4D1AA-A03C-4C17-B3F8-B2912CE7E807")!,
             name: "LAN App",
@@ -127,7 +125,7 @@ enum LocalhostChecks {
 
     private static func testWhitespaceOnlyConfigLoadsAsEmpty(in directory: URL) throws {
         let configURL = directory.appendingPathComponent("whitespace/projects.plist")
-        let store = ProjectConfigStore(configURL: configURL, legacyJSONURL: nil)
+        let store = ProjectConfigStore(configURL: configURL)
         try FileManager.default.createDirectory(
             at: configURL.deletingLastPathComponent(),
             withIntermediateDirectories: true
@@ -139,7 +137,7 @@ enum LocalhostChecks {
 
     private static func testInvalidConfigThrowsAndCreatesBackup(in directory: URL) throws {
         let configURL = directory.appendingPathComponent("invalid/projects.plist")
-        let store = ProjectConfigStore(configURL: configURL, legacyJSONURL: nil)
+        let store = ProjectConfigStore(configURL: configURL)
         try FileManager.default.createDirectory(
             at: configURL.deletingLastPathComponent(),
             withIntermediateDirectories: true
@@ -161,64 +159,6 @@ enum LocalhostChecks {
             }
             try expect(FileManager.default.fileExists(atPath: backupPath), "Expected invalid config backup to exist")
         }
-    }
-
-    private static func testLegacyPropertyListConfigMigratesToJocalhostPath(in directory: URL) throws {
-        let configURL = directory.appendingPathComponent("jocalhost/projects.plist")
-        let legacyURL = directory.appendingPathComponent("localhost-app/projects.plist")
-        let store = ProjectConfigStore(configURL: configURL, legacyPropertyListURL: legacyURL)
-        let project = ProjectDefinition(
-            id: UUID(uuidString: "C7209E4C-7B31-4DDF-80CE-9D1E8A09F720")!,
-            name: "Legacy Plist",
-            workingDirectory: "/tmp/legacy-plist",
-            command: "npm run dev",
-            port: 4000
-        )
-
-        try FileManager.default.createDirectory(
-            at: legacyURL.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-        try PropertyListEncoder().encode([project]).write(to: legacyURL, options: .atomic)
-
-        try expect(try store.load() == [project], "Expected legacy localhost-app plist config to migrate")
-        try expect(FileManager.default.fileExists(atPath: configURL.path), "Expected migrated jocalhost config to exist")
-        try expect(FileManager.default.fileExists(atPath: legacyURL.path) == false, "Expected legacy plist to be archived")
-        let archivedFiles = try FileManager.default.contentsOfDirectory(atPath: legacyURL.deletingLastPathComponent().path)
-            .filter { $0.hasPrefix("projects.legacy-localhost-app-") && $0.hasSuffix(".backup") }
-        try expect(archivedFiles.count == 1, "Expected one archived legacy plist backup")
-    }
-
-    private static func testLegacyJSONConfigMigratesToPropertyList(in directory: URL) throws {
-        let configURL = directory.appendingPathComponent("migration/projects.plist")
-        let legacyURL = directory.appendingPathComponent("migration/projects.json")
-        let store = ProjectConfigStore(configURL: configURL, legacyJSONURL: legacyURL)
-        let project = ProjectDefinition(
-            id: UUID(uuidString: "37BCB1E9-66D2-437D-A881-AF9579ED6797")!,
-            name: "Migrated",
-            workingDirectory: "/tmp/migrated",
-            command: "npm run dev",
-            port: 5173
-        )
-
-        try FileManager.default.createDirectory(
-            at: legacyURL.deletingLastPathComponent(),
-            withIntermediateDirectories: true
-        )
-
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try encoder.encode([project]).write(to: legacyURL, options: .atomic)
-
-        try expect(try store.load() == [project], "Expected legacy JSON config to migrate")
-        try expect(FileManager.default.fileExists(atPath: configURL.path), "Expected migrated plist config to exist")
-        try expect(FileManager.default.fileExists(atPath: legacyURL.path) == false, "Expected legacy projects.json to be archived")
-        let archivedFiles = try FileManager.default.contentsOfDirectory(atPath: legacyURL.deletingLastPathComponent().path)
-            .filter { $0.hasPrefix("projects.legacy-json-") && $0.hasSuffix(".backup") }
-        try expect(archivedFiles.count == 1, "Expected one archived legacy JSON backup")
-
-        let data = try Data(contentsOf: configURL)
-        _ = try PropertyListSerialization.propertyList(from: data, format: nil)
     }
 
     private static func testDevServerLaunchAdapterAddsHostFlags(in directory: URL) throws {
