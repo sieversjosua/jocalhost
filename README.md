@@ -156,6 +156,16 @@ Example client config:
 
 Tool summaries prefer `networkURL` and omit `localhost` preview links, so remote-device Codex sessions do not hand users a URL that only works on the host Mac.
 
+### Codex App
+
+jocalhost does not install Codex automatically. If the Codex CLI is available, run:
+
+```sh
+codex app
+```
+
+That opens the Codex desktop app when it is installed, or starts the installer when it is missing. Install the jocalhost Codex plugin from the Codex plugin directory, then start a new thread and type `Jocalhost`. The plugin uses `jocalhost-mcp`, including `add_project`, to register and start the current workspace when needed.
+
 ## Example Project Config
 
 ```xml
