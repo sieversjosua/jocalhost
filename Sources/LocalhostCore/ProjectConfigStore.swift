@@ -55,6 +55,53 @@ public struct ProjectConfigStore: Sendable {
         try data.write(to: configURL, options: .atomic)
     }
 
+    public func registerProject(
+        workingDirectory rawWorkingDirectory: String,
+        name rawName: String? = nil,
+        command rawCommand: String? = nil,
+        port: Int? = nil,
+        exposeOnLocalNetwork: Bool = true
+    ) throws -> ProjectRegistrationResult {
+        let workingDirectory = URL(fileURLWithPath: rawWorkingDirectory).standardizedFileURL.path
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: workingDirectory, isDirectory: &isDirectory),
+              isDirectory.boolValue else {
+            throw ProjectRegistrationError.workingDirectoryNotFound(workingDirectory)
+        }
+
+        var projects = try load()
+        if let existing = projects.first(where: { URL(fileURLWithPath: $0.workingDirectory).standardizedFileURL.path == workingDirectory }) {
+            return ProjectRegistrationResult(project: existing, created: false, configPath: configURL.path)
+        }
+
+        let detection = ProjectDetection.detect(in: workingDirectory)
+        let name = rawName?.trimmedNonEmpty ?? detection?.name ?? URL(fileURLWithPath: workingDirectory).lastPathComponent
+        guard let command = rawCommand?.trimmedNonEmpty ?? detection?.command?.trimmedNonEmpty else {
+            throw ProjectRegistrationError.missingCommand(workingDirectory)
+        }
+        let projectPort = port ?? detection?.port
+        let detectedServices = detection?.services.map {
+            ProjectServiceDefinition(
+                name: $0.name,
+                command: $0.command,
+                port: $0.port,
+                exposeOnLocalNetwork: exposeOnLocalNetwork
+            )
+        } ?? []
+
+        let project = ProjectDefinition(
+            name: name,
+            workingDirectory: workingDirectory,
+            command: command,
+            port: projectPort,
+            exposeOnLocalNetwork: exposeOnLocalNetwork,
+            services: detectedServices.count > 1 ? detectedServices : []
+        )
+        projects.append(project)
+        try save(projects)
+        return ProjectRegistrationResult(project: project, created: true, configPath: configURL.path)
+    }
+
     public func ensureExists() throws {
         let directoryURL = configURL.deletingLastPathComponent()
         try FileManager.default.createDirectory(
@@ -186,6 +233,26 @@ public struct ProjectConfigStore: Sendable {
     }
 }
 
+public struct ProjectRegistrationResult: Equatable, Sendable {
+    public var project: ProjectDefinition
+    public var created: Bool
+    public var configPath: String
+}
+
+public enum ProjectRegistrationError: LocalizedError, Equatable, Sendable {
+    case workingDirectoryNotFound(String)
+    case missingCommand(String)
+
+    public var errorDescription: String? {
+        switch self {
+        case let .workingDirectoryNotFound(path):
+            return "Working directory not found: \(path)"
+        case let .missingCommand(path):
+            return "Could not detect a dev command for \(path). Provide command explicitly."
+        }
+    }
+}
+
 public enum ProjectConfigStoreError: LocalizedError, Equatable, Sendable {
     case invalidConfig(path: String, backupPath: String?, underlying: String)
     case invalidLegacyJSON(path: String, underlying: String)
@@ -207,5 +274,12 @@ public enum ProjectConfigStoreError: LocalizedError, Equatable, Sendable {
 private extension UInt8 {
     var isASCIIWhitespace: Bool {
         self == 0x20 || self == 0x09 || self == 0x0A || self == 0x0D
+    }
+}
+
+private extension String {
+    var trimmedNonEmpty: String? {
+        let value = trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? nil : value
     }
 }

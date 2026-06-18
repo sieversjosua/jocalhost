@@ -12,6 +12,7 @@ struct LocalhostMCP {
 
 private final class MCPServer {
     private let encoder = JSONEncoder()
+    private let projectConfigStore = ProjectConfigStore()
     private let remoteHostStore = RemoteHostConfigStore()
     private let protocolVersion = "2025-06-18"
     private let serverName = "jocalhost"
@@ -142,6 +143,35 @@ private final class MCPServer {
                 annotations: ["readOnlyHint": false]
             ),
             tool(
+                name: "add_project",
+                title: "Add Project",
+                description: "Register a local workspace as a jocalhost project. Detects name, dev command, and port from package.json when omitted.",
+                properties: [
+                    "workingDirectory": [
+                        "type": "string",
+                        "description": "Absolute path to the project directory."
+                    ],
+                    "name": [
+                        "type": "string",
+                        "description": "Optional project name. Defaults to package.json name or folder name."
+                    ],
+                    "command": [
+                        "type": "string",
+                        "description": "Optional dev command. Defaults to detected dev/start/serve/preview script."
+                    ],
+                    "port": [
+                        "type": "integer",
+                        "description": "Optional dev server port."
+                    ],
+                    "exposeOnLocalNetwork": [
+                        "type": "boolean",
+                        "description": "Whether jocalhost should expose networkURL. Defaults to true."
+                    ]
+                ],
+                required: ["workingDirectory"],
+                annotations: ["readOnlyHint": false, "destructiveHint": false]
+            ),
+            tool(
                 name: "start_project",
                 title: "Start Project",
                 description: "Start a registered project through the jocalhost app.",
@@ -239,6 +269,9 @@ private final class MCPServer {
         case "reload_projects":
             return try invoke(.reload)
 
+        case "add_project":
+            return try addProject(arguments)
+
         case "start_project":
             return try controlProject(.start, project: try requiredProject(project), service: service)
 
@@ -266,6 +299,36 @@ private final class MCPServer {
         }
 
         return project
+    }
+
+    private func addProject(_ arguments: [String: Any]) throws -> [String: Any] {
+        guard let workingDirectory = arguments["workingDirectory"] as? String,
+              workingDirectory.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else {
+            throw MCPError(code: -32602, message: "Missing required argument: workingDirectory")
+        }
+
+        let result = try projectConfigStore.registerProject(
+            workingDirectory: workingDirectory,
+            name: arguments["name"] as? String,
+            command: arguments["command"] as? String,
+            port: arguments["port"] as? Int,
+            exposeOnLocalNetwork: (arguments["exposeOnLocalNetwork"] as? Bool) ?? true
+        )
+        _ = try? ControlClient.send(ControlRequest(action: .reload))
+
+        let project = (try? sanitizedJSON(result.project)) as? [String: Any] ?? [:]
+        let message = result.created ? "Added jocalhost project \(result.project.name)." : "Jocalhost project already exists: \(result.project.name)."
+        return toolResult(
+            text: message,
+            structuredContent: [
+                "ok": true,
+                "created": result.created,
+                "message": message,
+                "configPath": result.configPath,
+                "project": project
+            ],
+            isError: false
+        )
     }
 
     private func invoke(_ action: ControlAction, project: String? = nil, service: String? = nil) throws -> [String: Any] {

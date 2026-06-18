@@ -32,6 +32,31 @@ struct LocalhostCoreTests {
     }
 
     @Test
+    func projectRegistrationDetectsPackageDevScript() throws {
+        try withTemporaryDirectory { directory in
+            try """
+            {"name":"sample-app","scripts":{"dev":"vite --port 5173"}}
+            """.write(to: directory.appendingPathComponent("package.json"), atomically: true, encoding: .utf8)
+            let store = ProjectConfigStore(
+                configURL: directory.appendingPathComponent("projects.plist"),
+                legacyJSONURL: nil,
+                legacyPropertyListURL: nil
+            )
+
+            let first = try store.registerProject(workingDirectory: directory.path)
+            let second = try store.registerProject(workingDirectory: directory.path)
+
+            #expect(first.created)
+            #expect(!second.created)
+            #expect(first.project.name == "sample-app")
+            #expect(first.project.command == "npm run dev")
+            #expect(first.project.port == 5173)
+            #expect(first.project.exposeOnLocalNetwork)
+            #expect(try store.load().count == 1)
+        }
+    }
+
+    @Test
     func lanTokenIsStableAndPrivate() throws {
         try withTemporaryDirectory { directory in
             let tokenURL = directory.appendingPathComponent("lan-token")
