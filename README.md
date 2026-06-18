@@ -132,11 +132,14 @@ If a hosted project lives under protected macOS folders such as `~/Documents`, g
 - `list_projects`
 - `get_status`
 - `reload_projects`
+- `add_project`
 - `start_project`
 - `stop_project`
 - `restart_project`
 - `open_project`
 - `get_config_path`
+
+`add_project` registers a local workspace and can detect the project name, dev command, and port from `package.json`.
 
 Example client config:
 
