@@ -34,6 +34,7 @@ jocalhost is the small local boundary for that mess: one app owns the dev-server
 
 - Starts, stops, restarts, and opens configured dev servers.
 - Shows project status, PIDs, ports, local URLs, and LAN URLs from the macOS menu bar.
+- Treats configured ports as preferred ports and follows the actual listening port when a dev server falls back.
 - Stores config in `~/.config/jocalhost/projects.plist`.
 - Exposes a token-protected LAN status/control endpoint so another Mac can control the host Mac without confusing its own `localhost` with the host's `localhost`.
 - Provides `jocalhostctl` for CLI control and `jocalhost-mcp` for agent/MCP workflows.
@@ -179,6 +180,8 @@ Tool summaries prefer `networkURL` and omit `localhost` preview links, so remote
 </array>
 </plist>
 ```
+
+`port` is optional and means preferred port. If the managed dev server opens a different port, jocalhost shows and opens the detected runtime URL.
 
 ## Security
 
