@@ -100,7 +100,7 @@ final class ProjectStore: ObservableObject {
         let pids = serviceRuntimes.compactMap(\.pid)
         aggregate.pid = pids.count == 1 ? pids.first : nil
         aggregate.detectedPort = services.lazy.compactMap { service in
-            service.port ?? self.runtimes[service.id]?.detectedPort
+            (self.runtimes[service.id] ?? ProjectRuntime()).effectivePort(preferredPort: service.port)
         }.first
         aggregate.startedAt = serviceRuntimes.compactMap(\.startedAt).min()
         aggregate.lastExitCode = serviceRuntimes.compactMap(\.lastExitCode).first
@@ -171,17 +171,9 @@ final class ProjectStore: ObservableObject {
 
         if let port = service.port,
            let listener = PortInspector.listener(on: port),
-           listener.isOccupied,
-           runtime(for: service).isRunning == false {
+           listener.isOccupied {
             portListeners[port] = listener
-            updateRuntime(for: service.id) { runtime in
-                runtime.status = .failed
-                runtime.pid = nil
-            }
-
-            let message = "Port \(port) is already in use by pid(s): \(listener.pids.map(String.init).joined(separator: ", "))"
-            append("\(message)\n", to: service.id)
-            return ProjectActionResult(ok: false, message: message)
+            append("Preferred port \(port) is already in use by pid(s): \(listener.pids.map(String.init).joined(separator: ", ")); starting anyway.\n", to: service.id)
         }
 
         let token = UUID()
@@ -212,11 +204,6 @@ final class ProjectStore: ObservableObject {
                 runtime.status = service.port == nil ? .running : .starting
             }
             append("$ \(launch.command)\n", to: service.id)
-            if service.exposeOnLocalNetwork,
-               let port = service.port,
-               let networkURL = LocalNetwork.networkURL(port: port) {
-                append("Local network URL: \(networkURL)\n", to: service.id)
-            }
             refreshPorts()
 
             if let port = service.port {
@@ -315,7 +302,7 @@ final class ProjectStore: ObservableObject {
 
     func openURL(for project: ProjectDefinition) {
         guard let service = firstServiceWithPort(in: project),
-              let port = service.port ?? runtime(for: service).detectedPort else {
+              let port = runtime(for: service).effectivePort(preferredPort: service.port) else {
             return
         }
 
@@ -323,7 +310,7 @@ final class ProjectStore: ObservableObject {
     }
 
     func openURL(for service: ProjectServiceDefinition) {
-        guard let port = service.port ?? runtime(for: service).detectedPort else {
+        guard let port = runtime(for: service).effectivePort(preferredPort: service.port) else {
             return
         }
 
@@ -774,7 +761,7 @@ final class ProjectStore: ObservableObject {
             let firstService = project.effectiveServices.first
             let legacyCommand = firstService?.command ?? project.command
             let legacyPort = firstService?.port ?? project.port
-            let effectivePort = legacyPort ?? projectRuntime.detectedPort
+            let effectivePort = projectRuntime.effectivePort(preferredPort: legacyPort)
             let portPids = effectivePort.flatMap { portListeners[$0]?.pids } ?? []
             let projectExposesLocalNetwork = firstService?.exposeOnLocalNetwork ?? project.exposeOnLocalNetwork
             let projectLocalURL = effectivePort.map(LocalNetwork.localURL(port:))
@@ -783,7 +770,7 @@ final class ProjectStore: ObservableObject {
             }
             let serviceSnapshots = project.effectiveServices.map { service in
                 let serviceRuntime = runtime(for: service)
-                let servicePort = service.port ?? serviceRuntime.detectedPort
+                let servicePort = serviceRuntime.effectivePort(preferredPort: service.port)
                 let servicePortPids = servicePort.flatMap { portListeners[$0]?.pids } ?? []
                 let localURL = servicePort.map(LocalNetwork.localURL(port:))
                 let networkURL = servicePort.flatMap { port in
@@ -884,25 +871,25 @@ final class ProjectStore: ObservableObject {
                     return
                 }
 
+                if let detectedPort = updateDetectedPort(for: service.id) {
+                    updateRuntime(for: service.id) { runtime in
+                        runtime.status = .running
+                        runtime.detectedPort = detectedPort
+                    }
+                    startTokens[service.id] = nil
+
+                    if detectedPort != port {
+                        append("Using localhost:\(detectedPort); preferred port \(port) was unavailable.\n", to: service.id)
+                    }
+                    if service.exposeOnLocalNetwork,
+                       let networkURL = LocalNetwork.networkURL(port: detectedPort) {
+                        append("Local network URL: \(networkURL)\n", to: service.id)
+                    }
+                    return
+                }
+
                 if let listener = PortInspector.listener(on: port), listener.isOccupied {
                     portListeners[port] = listener
-
-                    let managedPIDs = supervisor.managedPIDs(for: service.id)
-                    if listener.pids.contains(where: managedPIDs.contains) {
-                        updateRuntime(for: service.id) { runtime in
-                            runtime.status = .running
-                            runtime.detectedPort = port
-                        }
-                        startTokens[service.id] = nil
-                        return
-                    }
-
-                    updateRuntime(for: service.id) { runtime in
-                        runtime.status = .failed
-                    }
-                    append("Port \(port) was taken by unrelated pid(s): \(listener.pids.map(String.init).joined(separator: ", "))\n", to: service.id)
-                    supervisor.stop(serviceID: service.id)
-                    return
                 }
 
                 try? await Task.sleep(for: .milliseconds(250))
@@ -916,7 +903,7 @@ final class ProjectStore: ObservableObject {
             updateRuntime(for: service.id) { runtime in
                 runtime.status = .failed
             }
-            append("Timed out waiting for localhost:\(port) to listen.\n", to: service.id)
+            append("Timed out waiting for a managed localhost port, preferred \(port).\n", to: service.id)
             supervisor.stop(serviceID: service.id)
         }
     }
@@ -984,7 +971,7 @@ final class ProjectStore: ObservableObject {
                     return
                 }
 
-                if updateDetectedPort(for: serviceID) {
+                if updateDetectedPort(for: serviceID) != nil {
                     return
                 }
 
@@ -999,17 +986,17 @@ final class ProjectStore: ObservableObject {
         }
     }
 
-    private func updateDetectedPort(for serviceID: UUID) -> Bool {
+    private func updateDetectedPort(for serviceID: UUID) -> Int? {
         let listeners = PortInspector.listeners(forPIDs: supervisor.managedPIDs(for: serviceID))
         guard let listener = listeners.first else {
-            return false
+            return nil
         }
 
         updateRuntime(for: serviceID) { runtime in
             runtime.detectedPort = listener.port
         }
         portListeners[listener.port] = listener
-        return true
+        return listener.port
     }
 
     private func inspectPorts(_ ports: Set<Int>) -> [Int: PortListener] {

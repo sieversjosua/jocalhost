@@ -102,6 +102,15 @@ struct LocalhostCoreTests {
         }
     }
 
+    @Test
+    func runtimeEffectivePortPrefersDetectedPort() {
+        var runtime = ProjectRuntime()
+        #expect(runtime.effectivePort(preferredPort: 5173) == 5173)
+
+        runtime.detectedPort = 5174
+        #expect(runtime.effectivePort(preferredPort: 5173) == 5174)
+    }
+
     private func withTemporaryDirectory(_ body: (URL) throws -> Void) throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("LocalhostCoreTests-\(UUID().uuidString)", isDirectory: true)

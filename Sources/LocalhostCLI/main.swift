@@ -72,13 +72,13 @@ struct LocalhostCLI {
             }
 
             for project in response.projects {
-                let url = project.networkURL ?? project.localURL ?? (project.port ?? project.detectedPort).map { ":\($0)" } ?? "-"
+                let url = project.networkURL ?? project.localURL ?? (project.detectedPort ?? project.port).map { ":\($0)" } ?? "-"
                 let pid = project.pid.map(String.init) ?? "-"
                 let occupied = project.portPids.isEmpty ? "" : " port-pids=\(project.portPids.map(String.init).joined(separator: ","))"
                 print("\(project.status.rawValue.padding(toLength: 9, withPad: " ", startingAt: 0)) \(column(url, width: 26)) pid=\(pid.padding(toLength: 7, withPad: " ", startingAt: 0)) \(project.name)\(occupied)")
                 if project.services.count > 1 {
                     for service in project.services {
-                        let serviceURL = service.networkURL ?? service.localURL ?? (service.port ?? service.detectedPort).map { ":\($0)" } ?? "-"
+                        let serviceURL = service.networkURL ?? service.localURL ?? (service.detectedPort ?? service.port).map { ":\($0)" } ?? "-"
                         let servicePid = service.pid.map(String.init) ?? "-"
                         print("  \(service.status.rawValue.padding(toLength: 9, withPad: " ", startingAt: 0)) \(column(serviceURL, width: 26)) pid=\(servicePid.padding(toLength: 7, withPad: " ", startingAt: 0)) \(service.name)")
                     }

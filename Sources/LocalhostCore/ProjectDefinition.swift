@@ -158,6 +158,10 @@ public struct ProjectRuntime: Equatable, Sendable {
     public var isRunning: Bool {
         status == .starting || status == .running || status == .stopping
     }
+
+    public func effectivePort(preferredPort: Int?) -> Int? {
+        detectedPort ?? preferredPort
+    }
 }
 
 public struct PortListener: Equatable, Sendable {

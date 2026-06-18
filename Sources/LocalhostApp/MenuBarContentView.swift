@@ -307,7 +307,7 @@ struct ProjectRowView: View {
             service.port != nil || store.runtime(for: service).detectedPort != nil
         }
         let effectivePort = urlService.flatMap { service in
-            service.port ?? store.runtime(for: service).detectedPort
+            store.runtime(for: service).effectivePort(preferredPort: service.port)
         }
 
         VStack(alignment: .leading, spacing: 10) {
@@ -344,6 +344,12 @@ struct ProjectRowView: View {
                         port: port,
                         exposeOnLocalNetwork: urlService?.exposeOnLocalNetwork == true
                     )
+                }
+                if let urlService,
+                   let preferredPort = urlService.port,
+                   let detectedPort = store.runtime(for: urlService).detectedPort,
+                   detectedPort != preferredPort {
+                    WarningLine(text: "Using port \(detectedPort); preferred \(preferredPort) is unavailable.")
                 }
             } else if runtime.isRunning {
                 URLDetectionPendingLine()
@@ -389,7 +395,7 @@ struct ProjectRowView: View {
         VStack(alignment: .leading, spacing: 6) {
             ForEach(services) { service in
                 let runtime = store.runtime(for: service)
-                let effectivePort = service.port ?? runtime.detectedPort
+                let effectivePort = runtime.effectivePort(preferredPort: service.port)
 
                 HStack(spacing: 8) {
                     StatusIndicator(status: runtime.status)
@@ -492,7 +498,7 @@ struct ProjectRowView: View {
             parts.append("pid \(pid)")
         }
 
-        if let port = project.port ?? runtime.detectedPort {
+        if let port = runtime.effectivePort(preferredPort: project.port) {
             parts.append("port \(port)")
         }
 
@@ -723,7 +729,7 @@ private struct RemoteProjectLine: View {
             return "Starting - Full Disk Access may be required"
 
         case .starting:
-            if let port = project.port ?? project.detectedPort {
+            if let port = project.detectedPort ?? project.port {
                 return "Starting - waiting for port \(port)"
             }
 
